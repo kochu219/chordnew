@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chord Chart Example</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    .tooltip {
+      position: absolute;
+      pointer-events: none;
+      background-color: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 5px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <svg id="chart"></svg>
+  <div class="tooltip"></div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    // Example edge list
+    const edges = [
+      { source: "A", target: "B" },
+      { source: "B", target: "C" },
+      { source: "C", target: "A" },
+      { source: "C", target: "D" }
+    ];
+
+    // Create a chord chart from the edge list
+    const chart = () => {
+      const width = 500;
+      const height = 500;
+      const radius = Math.min(width, height) * 0.4;
+
+      const svg = d3.select("#chart")
+        .attr("width", width)
+        .attr("height", height)
+        .append("g")
+        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+      const chord = d3.chord()
+        .padAngle(0.05)
+        .sortSubgroups(d3.descending)
+        .sortChords(d3.descending);
+
+      const matrix = createMatrix(edges);
+      const chords = chord(matrix);
+
+      const arc = d3.arc()
+        .innerRadius(radius)
+        .outerRadius(radius + 10);
+
+      const ribbon = d3.ribbon()
+        .radius(radius);
+
+      svg.append("g")
+        .selectAll("path")
+        .data(chords)
+        .join("path")
+        .attr("d", ribbon)
+        .attr("fill", "steelblue")
+        .attr("opacity", 0.7)
+        .on("mouseover", showTooltip)
+        .on("mousemove", updateTooltip)
+        .on("mouseout", hideTooltip);
+
+      svg.append("g")
+        .selectAll("g")
+        .data(chords.groups)
+        .join("g")
+        .append("path")
+        .attr("fill", "steelblue")
+        .attr("d", arc)
+        .on("mouseover", showTooltip)
+        .on("mousemove", updateTooltip)
+        .on("mouseout", hideTooltip);
+
+      svg.append("g")
+        .selectAll("g")
+        .data(chords.groups)
+        .join("g")
+        .append("text")
+        .each((d) => {
+          d.angle = (d.startAngle + d.endAngle) / 2;
+        })
+        .attr("dy", "0.35em")
+        .attr("transform", (d) => `
+          rotate(${(d.angle * 180 / Math.PI - 90)})
+          translate(${radius + 10})
+          ${d.angle > Math.PI ? "rotate(180)" : ""}
+        `)
+        .attr("text-anchor", (d) => (d.angle > Math.PI ? "end" : null))
+        .text((d, i) => String.fromCharCode(65 + i));
+
+      // Tooltip functions
+      const tooltip = d3.select(".tooltip");
+
+      function showTooltip(d) {
+        tooltip
+          .style("opacity", 1)
+          .html(getTooltipContent(d))
+          .style("left", `${d3.event.pageX + 10}px`)
+          .style("top", `${d3.event.pageY + 10}px`);
+      }
+
+      function updateTooltip(d) {
+        tooltip
+          .style("left", `${d3.event.pageX + 10}px`)
+          .style("top", `${d3.event.pageY + 10}px`);
+      }
+
+      function hideTooltip() {
+        tooltip.style("opacity", 0);
+      }
+
+      function getTooltipContent(d) {
+        if (d.source) {
+          const source = String.fromCharCode(65 + d.source.index);
+          const target = String.fromCharCode(65 + d.target.index);
+          return `${source} to ${target}: ${matrix[d.source.index][d.target.index]}`;
+        } else {
+          const group = String.fromCharCode(65 + d.index);
+          return `Group ${group}`;
+        }
+      }
+    };
+
+    // Utility function to create the matrix from the edge list
+    const createMatrix = (edges) => {
+      const matrix = [];
+      const nodes = Array.from(new Set(edges.flatMap((d) => [d.source, d.target])));
+
+      nodes.forEach((source, i) => {
+        matrix[i] = new Array(nodes.length).fill(0);
+        edges.forEach(({ source: s, target: t }) => {
+          if (s === source) {
+            matrix[i][nodes.indexOf(t)]++;
+          }
+        });
+      });
+
+      return matrix;
+    };
+
+    chart();
+  </script>
+</body>
+</html>
